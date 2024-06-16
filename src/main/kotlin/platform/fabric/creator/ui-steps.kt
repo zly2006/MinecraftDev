@@ -21,21 +21,11 @@
 package com.demonwav.mcdev.platform.fabric.creator
 
 import com.demonwav.mcdev.creator.platformtype.ModPlatformStep
-import com.demonwav.mcdev.creator.step.AbstractCollapsibleStep
-import com.demonwav.mcdev.creator.step.AbstractLatentStep
-import com.demonwav.mcdev.creator.step.AbstractMcVersionChainStep
-import com.demonwav.mcdev.creator.step.AuthorsStep
-import com.demonwav.mcdev.creator.step.DescriptionStep
-import com.demonwav.mcdev.creator.step.LicenseStep
-import com.demonwav.mcdev.creator.step.ModIdStep
-import com.demonwav.mcdev.creator.step.ModNameStep
+import com.demonwav.mcdev.creator.step.*
 import com.demonwav.mcdev.creator.step.NewProjectWizardChainStep.Companion.nextStep
-import com.demonwav.mcdev.creator.step.RepositoryStep
-import com.demonwav.mcdev.creator.step.UseMixinsStep
-import com.demonwav.mcdev.creator.step.VersionChainComboBox
-import com.demonwav.mcdev.creator.step.WebsiteStep
 import com.demonwav.mcdev.platform.fabric.util.FabricApiVersions
 import com.demonwav.mcdev.platform.fabric.util.FabricVersions
+import com.demonwav.mcdev.platform.fabric.util.getLatestFabricLanguageKotlin
 import com.demonwav.mcdev.platform.forge.inspections.sideonly.Side
 import com.demonwav.mcdev.util.SemanticVersion
 import com.demonwav.mcdev.util.asyncIO
@@ -49,31 +39,37 @@ import com.intellij.openapi.observable.util.transform
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.ui.JBColor
-import com.intellij.ui.dsl.builder.Cell
-import com.intellij.ui.dsl.builder.Panel
-import com.intellij.ui.dsl.builder.Row
-import com.intellij.ui.dsl.builder.bindItem
-import com.intellij.ui.dsl.builder.bindSelected
-import com.intellij.ui.dsl.builder.bindText
+import com.intellij.ui.dsl.builder.*
 import com.intellij.util.IncorrectOperationException
 import kotlinx.coroutines.coroutineScope
 
 class FabricPlatformStep(
     parent: ModPlatformStep,
-) : AbstractLatentStep<Pair<FabricVersions, FabricApiVersions>>(parent) {
+) : AbstractLatentStep<FabricPlatformStep.FabricData>(parent) {
+    class FabricData(
+        val fabric: FabricVersions,
+        val fabricApi: FabricApiVersions,
+        val fabricLanguageKotlin: String,
+    )
     override val description = "download Fabric versions"
 
     override suspend fun computeData() = coroutineScope {
         val fabricVersions = asyncIO { FabricVersions.downloadData() }
         val fabricApiVersions = asyncIO { FabricApiVersions.downloadData() }
-        fabricVersions.await()?.let { a -> fabricApiVersions.await()?.let { b -> a to b } }
+        fabricVersions.await()?.let { fabric ->
+            fabricApiVersions.await()?.let { fabricApi ->
+                getLatestFabricLanguageKotlin()?.let { flk ->
+                    FabricData(fabric, fabricApi, flk)
+                }
+            }
+        }
     }
 
-    override fun createStep(data: Pair<FabricVersions, FabricApiVersions>): NewProjectWizardStep {
-        val (fabricVersions, apiVersions) = data
-        return FabricVersionChainStep(this, fabricVersions, apiVersions)
+    override fun createStep(data: FabricData): NewProjectWizardStep {
+        return FabricVersionChainStep(this, data.fabric, data.fabricApi)
             .nextStep(::FabricEnvironmentStep)
             .nextStep(::UseMixinsStep)
+            .nextStep { UseKotlinStep(it, data.fabricLanguageKotlin) }
             .nextStep(::ModIdStep)
             .nextStep(::ModNameStep)
             .nextStep(::LicenseStep)
@@ -104,6 +100,7 @@ class FabricVersionChainStep(
         val YARN_VERSION_KEY = Key.create<String>("${FabricVersionChainStep::class.java.name}.yarnVersion")
         val API_VERSION_KEY = Key.create<SemanticVersion>("${FabricVersionChainStep::class.java.name}.apiVersion")
         val OFFICIAL_MAPPINGS_KEY = Key.create<Boolean>("${FabricVersionChainStep::class.java.name}.officialMappings")
+        val FABRIC_LANGUAGE_KOTLIN_KEY = Key.create<String>("${FabricVersionChainStep::class.java.name}.fabricLanguageKotlin")
     }
 
     private val showSnapshotsProperty = propertyGraph.property(false)

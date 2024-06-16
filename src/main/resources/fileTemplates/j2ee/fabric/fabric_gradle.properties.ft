@@ -18,4 +18,8 @@ org.gradle.jvmargs=-Xmx1G
 # Dependencies
 	# check this on https://modmuss50.me/fabric.html
 	fabric_version=${API_VERSION}
+
+	#if (${FLK_VERSION})
+    fabric_kotlin_version=${FLK_VERSION}
+	#end
 #end

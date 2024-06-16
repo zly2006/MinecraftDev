@@ -61,6 +61,8 @@ class FabricGradleFilesStep(parent: NewProjectWizardStep) : AbstractLongRunningA
         val javaVersion = findStep<JdkProjectSetupFinalizer>().preferredJdk.ordinal
         val apiVersion = data.getUserData(FabricVersionChainStep.API_VERSION_KEY)
         val officialMappings = data.getUserData(FabricVersionChainStep.OFFICIAL_MAPPINGS_KEY) ?: false
+        val useKotlin = data.getUserData(UseKotlinStep.KEY) ?: false
+        val flkVersion = data.getUserData(FabricVersionChainStep.FABRIC_LANGUAGE_KOTLIN_KEY) ?: ""
 
         assets.addTemplateProperties(
             "GROUP_ID" to buildSystemProps.groupId,
@@ -73,6 +75,15 @@ class FabricGradleFilesStep(parent: NewProjectWizardStep) : AbstractLongRunningA
             "JAVA_VERSION" to javaVersion,
         )
 
+        if (useKotlin) {
+            assets.addTemplateProperties(
+                "KOTLIN_VERSION" to flkVersion
+                    .substringAfter("+kotlin.")
+                    .substringBefore("+")
+            )
+            assets.addTemplateProperties("FLK_VERSION" to flkVersion)
+        }
+
         if (apiVersion != null) {
             assets.addTemplateProperties("API_VERSION" to apiVersion)
         }
@@ -83,7 +94,8 @@ class FabricGradleFilesStep(parent: NewProjectWizardStep) : AbstractLongRunningA
 
         assets.addTemplates(
             project,
-            "build.gradle" to MinecraftTemplates.FABRIC_BUILD_GRADLE_TEMPLATE,
+            if (useKotlin) "build.gradle.kts" to MinecraftTemplates.FABRIC_BUILD_GRADLE_KTS_TEMPLATE
+            else "build.gradle" to MinecraftTemplates.FABRIC_BUILD_GRADLE_TEMPLATE,
             "gradle.properties" to MinecraftTemplates.FABRIC_GRADLE_PROPERTIES_TEMPLATE,
             "settings.gradle" to MinecraftTemplates.FABRIC_SETTINGS_GRADLE_TEMPLATE,
         )
